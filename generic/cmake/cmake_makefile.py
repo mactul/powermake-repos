@@ -2,7 +2,12 @@ import powermake
 import typing as T
 
 def on_build(config: powermake.Config):
-    powermake.run_cmake(config, "..", "-DCMAKE_BUILD_TYPE=Release")
+    if config._args_parsed.install is not None:
+        install_path = config._args_parsed.install
+    else:
+        install_path = "./install"
+
+    powermake.run_cmake(config, "..", "-DCMAKE_BUILD_TYPE=Release", f"-DCMAKE_INSTALL_PREFIX={install_path}")
     if powermake.run_command(config, ["make", "-j8"]) != 0:
         raise powermake.PowerMakeRuntimeError("make failed")
 

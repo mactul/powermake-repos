@@ -35,8 +35,8 @@ def on_build(config: powermake.Config):
         dependencies.append(powermake.package.find_lib(config, dep_name, powermake_libs_dir, min_version=dep_min_ver, max_version=dep_max_ver))
 
     powermake.run_cmake(config, "..", "-DCMAKE_BUILD_TYPE=Release", f"-DCMAKE_INSTALL_PREFIX={install_path}", *args_parsed.cmake_flag, prefer_static=args_parsed.cmake_static, dependencies=dependencies)
-    if powermake.run_command(config, ["make", "-j8"]) != 0:
-        raise powermake.PowerMakeRuntimeError("make failed")
+    if powermake.run_command(config, ["cmake", "--build", ".", "--config", "Release", "-j", str(os.cpu_count() or 2)]) != 0:
+        raise powermake.PowerMakeRuntimeError("build failed")
 
 def on_install(config: powermake.Config, install_path: T.Union[str, None]):
     if install_path is None or not config.rebuild:

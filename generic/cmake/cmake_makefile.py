@@ -32,7 +32,7 @@ def on_build(config: powermake.Config):
         if dep_max_ver == 'None':
             dep_max_ver = None
 
-        dependencies.append(powermake.package.find_lib(config, dep_name, powermake_libs_dir, min_version=dep_min_ver, max_version=dep_max_ver))
+        dependencies.append(powermake.package.find_lib(config, dep_name, install_dir=powermake_libs_dir, min_version=dep_min_ver, max_version=dep_max_ver))
 
     powermake.run_cmake(config, "..", "-DCMAKE_BUILD_TYPE=Release", f"-DCMAKE_INSTALL_PREFIX={install_path}", *args_parsed.cmake_flag, prefer_static=args_parsed.cmake_static, dependencies=dependencies)
     if powermake.run_command(config, ["cmake", "--build", ".", "--config", "Release", "-j", str(os.cpu_count() or 2)]) != 0:

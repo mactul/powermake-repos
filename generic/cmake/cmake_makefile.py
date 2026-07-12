@@ -32,15 +32,31 @@ def on_build(config: powermake.Config):
 
 
     for dep in args_parsed.dependency:
-        if dep.count(',') != 2:
-            raise powermake.PowerMakeValueError("dependency syntax: libname,min_ver,max_ver")
-        dep_name, dep_min_ver, dep_max_ver = dep.split(',')
+        force = ""
+        count = dep.count(',')
+        if count == 2:
+            dep_name, dep_min_ver, dep_max_ver = dep.split(',')
+        elif count == 3:
+            dep_name, dep_min_ver, dep_max_ver, force = dep.split(',')
+            if force != "force":
+                raise powermake.PowerMakeValueError("dependency syntax: libname,min_ver,max_ver[,force]")
+        else:
+            raise powermake.PowerMakeValueError("dependency syntax: libname,min_ver,max_ver[,force]")
+
         if dep_min_ver == 'None':
             dep_min_ver = None
         if dep_max_ver == 'None':
             dep_max_ver = None
 
-        dependencies.append(powermake.package.find_lib(config, dep_name, install_dir=powermake_libs_dir, min_version=dep_min_ver, max_version=dep_max_ver))
+        lib = powermake.package.find_lib(config, dep_name, install_dir=powermake_libs_dir, min_version=dep_min_ver, max_version=dep_max_ver)
+
+        if force == "force":
+            args_parsed.cmake_flag.extend([
+                f"-DCMAKE_C_STANDARD_LIBRARIES={lib.lib_file}",
+                f"-DCMAKE_CXX_STANDARD_LIBRARIES={lib.lib_file}"
+            ])
+
+        dependencies.append(lib)
 
     print("dependencies found:", dependencies)
 

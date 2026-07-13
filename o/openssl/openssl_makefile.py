@@ -72,6 +72,8 @@ def on_build(config: powermake.Config) -> None:
 
     if config.host_is_windows():
         windows_get_nasm(config)
+        os.environ["AS"] = shutil.which("nasm") or ""
+        os.environ["ASM"] = shutil.which("nasm") or ""
 
     target = None
     if config.target_is_mingw() and config.target_simplified_architecture == "x86":

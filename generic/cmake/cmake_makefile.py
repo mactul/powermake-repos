@@ -41,7 +41,7 @@ def on_build(config: powermake.Config):
             dep_name, dep_min_ver, dep_max_ver = dep.split(',')
         elif count == 3:
             dep_name, dep_min_ver, dep_max_ver, force = dep.split(',')
-            if force != "force":
+            if force not in ("force", "force_before"):
                 raise powermake.PowerMakeValueError("dependency syntax: libname,min_ver,max_ver[,force]")
         else:
             raise powermake.PowerMakeValueError("dependency syntax: libname,min_ver,max_ver[,force]")
@@ -57,6 +57,11 @@ def on_build(config: powermake.Config):
             args_parsed.cmake_flag.extend([
                 f"-DCMAKE_C_STANDARD_LIBRARIES={lib.lib_file}",
                 f"-DCMAKE_CXX_STANDARD_LIBRARIES={lib.lib_file}"
+            ])
+        elif force == "force_before":
+            args_parsed.cmake_flag.extend([
+                f"-DCMAKE_EXE_LINKER_FLAGS={lib.lib_file}",
+                f"-DCMAKE_SHARED_LINKER_FLAGS={lib.lib_file}"
             ])
 
         dependencies.append(lib)

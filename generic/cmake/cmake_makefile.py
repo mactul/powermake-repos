@@ -26,6 +26,9 @@ def on_build(config: powermake.Config):
 
     powermake_libs_dir = os.path.abspath(os.path.join(install_path, "../../../../../"))
 
+    if "ASM" in os.environ:
+        del os.environ["ASM"]  # This might not have the same meaning for CMake
+
     if args_parsed.autogen_sh:
         if powermake.run_command(config, ["bash", "autogen.sh"], cwd="..") != 0:
             raise powermake.PowerMakeRuntimeError("autogen failed")

@@ -7,7 +7,7 @@ import powermake.package
 
 parser = powermake.ArgumentParser()
 parser.add_argument("--cmake-static", help="instruct cmake to prefer building a static lib if possible", action="store_true")
-parser.add_argument("--dependency", metavar="DEPENDENCY", help="syntax: libname,min_ver,max_ver, may be given multiple time", action="append", default=[])
+parser.add_argument("--dependency", metavar="DEPENDENCY", help="syntax: libname,min_ver,max_ver[,force] ; may be given multiple time", action="append", default=[])
 parser.add_argument("--cmake-flag", metavar="FLAG", help="A flag to transmit to CMake, may be given multiple time", action="append", default=[])
 parser.add_argument("--autogen-sh", help="Run `bash autogen.sh` before anything else", action="store_true")
 parser.add_argument("--remove-one-subfolder", metavar="folder_name", help="If the install had an unwanted subfolder, like lib/mariadb/mariadb.so, remove this subfolder to end up with lib/mariadb.so", default=None)

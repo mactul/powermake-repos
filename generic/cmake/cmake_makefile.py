@@ -7,10 +7,12 @@ import powermake.package
 
 parser = powermake.ArgumentParser()
 parser.add_argument("--cmake-static", help="instruct cmake to prefer building a static lib if possible", action="store_true")
+parser.add_argument("--need-libmath", help="instruct cmake to force include the libmath", action="store_true")
 parser.add_argument("--dependency", metavar="DEPENDENCY", help="syntax: libname,min_ver,max_ver[,force] ; may be given multiple time", action="append", default=[])
 parser.add_argument("--cmake-flag", metavar="FLAG", help="A flag to transmit to CMake, may be given multiple time", action="append", default=[])
 parser.add_argument("--autogen-sh", help="Run `bash autogen.sh` before anything else", action="store_true")
 parser.add_argument("--remove-one-subfolder", metavar="folder_name", help="If the install had an unwanted subfolder, like lib/mariadb/mariadb.so, remove this subfolder to end up with lib/mariadb.so", default=None)
+parser.add_argument("--copy-tree", metavar="SRC,DEST", help="Copy a folder from the build folder to the install folder. May be given multiple times", action="append", default=[])
 
 
 args_parsed = parser.parse_args()
@@ -34,6 +36,9 @@ def on_build(config: powermake.Config):
             raise powermake.PowerMakeRuntimeError("autogen failed")
 
 
+    forced_libs: T.List[str] = []
+    forced_before_libs: T.List[str] = []
+
     for dep in args_parsed.dependency:
         force = ""
         count = dep.count(',')
@@ -54,19 +59,40 @@ def on_build(config: powermake.Config):
         lib = powermake.package.find_lib(config, dep_name, install_dir=powermake_libs_dir, min_version=dep_min_ver, max_version=dep_max_ver)
 
         if force == "force":
-            args_parsed.cmake_flag.extend([
-                f"-DCMAKE_C_STANDARD_LIBRARIES={lib.lib_file}",
-                f"-DCMAKE_CXX_STANDARD_LIBRARIES={lib.lib_file}"
-            ])
+            forced_libs.append(lib.lib_file)
+            
         elif force == "force_before":
-            args_parsed.cmake_flag.extend([
-                f"-DCMAKE_EXE_LINKER_FLAGS={lib.lib_file}",
-                f"-DCMAKE_SHARED_LINKER_FLAGS={lib.lib_file}"
-            ])
+            forced_before_libs.append(lib.lib_file)
 
         dependencies.append(lib)
+    
+    if args_parsed.need_libmath and (not config.target_is_windows() or config.target_is_mingw()):
+        forced_libs.append("-lm")
+    
+    if len(forced_libs) > 0:
+        args_parsed.cmake_flag.extend([
+            f"-DCMAKE_C_STANDARD_LIBRARIES={' '.join(forced_libs)}",
+            f"-DCMAKE_CXX_STANDARD_LIBRARIES={' '.join(forced_libs)}"
+        ])
+    if len(forced_before_libs) > 0:
+        args_parsed.cmake_flag.extend([
+            f"-DCMAKE_EXE_LINKER_FLAGS={' '.join(forced_before_libs)}",
+            f"-DCMAKE_SHARED_LINKER_FLAGS={' '.join(forced_before_libs)}"
+        ])
 
     print("dependencies found:", dependencies)
+
+    if hasattr(config, 'sdk_path'):
+        if config.target_is_android():
+            args_parsed.cmake_flag.extend([
+                f"-DCMAKE_TOOLCHAIN_FILE={os.path.join(config.sdk_path, 'ndk/27.3.13750724/build/cmake/android.toolchain.cmake')}",
+                "-DANDROID_PLATFORM=24"
+            ])
+            android_abis = {
+                'arm64': 'arm64-v8a'
+            }
+            if config.target_simplified_architecture in android_abis:
+                args_parsed.cmake_flag.append(f"-DANDROID_ABI={android_abis[config.target_simplified_architecture]}")
 
     powermake.run_cmake(config, "..", "-DCMAKE_BUILD_TYPE=Release", f"-DCMAKE_INSTALL_PREFIX={install_path}", *args_parsed.cmake_flag, prefer_static=args_parsed.cmake_static, dependencies=dependencies)
     if powermake.run_command(config, ["cmake", "--build", ".", "--config", "Release", "-j", str(os.cpu_count() or 2)]) != 0:
@@ -82,5 +108,10 @@ def on_install(config: powermake.Config, install_path: T.Union[str, None]):
         os.rename(os.path.join(install_path, "lib", args_parsed.remove_one_subfolder), os.path.join(install_path, "temp_lib"))
         shutil.rmtree(os.path.join(install_path, "lib"))
         os.rename(os.path.join(install_path, "temp_lib"), os.path.join(install_path, "lib"))
+    for string in args_parsed.copy_tree:
+        src, dest = string.split(',')
+        dest = os.path.join(install_path, dest)
+        print("copying", src, "into", dest)
+        shutil.copytree(src, dest)
 
 powermake.run("generic_cmake", build_callback=on_build, install_callback=on_install, args_parsed=args_parsed)

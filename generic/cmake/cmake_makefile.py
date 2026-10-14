@@ -98,6 +98,15 @@ def on_build(config: powermake.Config):
     if powermake.run_command(config, ["cmake", "--build", ".", "--config", "Release", "-j", str(os.cpu_count() or 2)]) != 0:
         raise powermake.PowerMakeRuntimeError("build failed")
 
+def _get_recursives_deps(libs: T.List[powermake.package.Lib]) -> T.List[powermake.package.Lib]:
+    deps: T.List[powermake.package.Lib] = []
+    for lib in libs:
+        if len(lib.dependencies) > 0:
+            deps.extend(_get_recursives_deps(lib.dependencies))
+        deps.append(lib)
+    return deps
+
+
 def on_install(config: powermake.Config, install_path: T.Union[str, None]):
     if install_path is None or not config.rebuild:
         raise powermake.PowerMakeValueError("You should use this makefile with -r and --install")
@@ -113,5 +122,15 @@ def on_install(config: powermake.Config, install_path: T.Union[str, None]):
         dest = os.path.join(install_path, dest)
         print("copying", src, "into", dest)
         shutil.copytree(src, dest)
+    
+    if len(config._package_libs) > 0:
+        written_deps: T.Set[str] = set()
+        with open(os.path.join(install_path, "powermake_dependencies.txt"), "w") as file:
+            deps = _get_recursives_deps(config._package_libs)
+            for dep in deps:
+                if dep.lib_file in written_deps:
+                    continue
+                written_deps.add(dep.lib_file)
+                file.write(f"{dep.lib_file},{dep.includedir},{dep.version},{dep.soname},{dep.is_system}\n")
 
 powermake.run("generic_cmake", build_callback=on_build, install_callback=on_install, args_parsed=args_parsed)

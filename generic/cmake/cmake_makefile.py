@@ -9,6 +9,7 @@ parser = powermake.ArgumentParser()
 parser.add_argument("--cmake-static", help="instruct cmake to prefer building a static lib if possible", action="store_true")
 parser.add_argument("--need-libmath", help="instruct cmake to force include the libmath", action="store_true")
 parser.add_argument("--dependency", metavar="DEPENDENCY", help="syntax: libname,min_ver,max_ver[,force] ; may be given multiple time", action="append", default=[])
+parser.add_argument("--mingw-dependency", metavar="DEPENDENCY", help="syntax: libname,min_ver,max_ver[,force] ; may be given multiple time", action="append", default=[])
 parser.add_argument("--cmake-flag", metavar="FLAG", help="A flag to transmit to CMake, may be given multiple time", action="append", default=[])
 parser.add_argument("--autogen-sh", help="Run `bash autogen.sh` before anything else", action="store_true")
 parser.add_argument("--remove-one-subfolder", metavar="folder_name", help="If the install had an unwanted subfolder, like lib/mariadb/mariadb.so, remove this subfolder to end up with lib/mariadb.so", default=None)
@@ -39,7 +40,12 @@ def on_build(config: powermake.Config):
     forced_libs: T.List[str] = []
     forced_before_libs: T.List[str] = []
 
-    for dep in args_parsed.dependency:
+    dependencies_cmdline: T.List[str] = list(args_parsed.dependency)
+    if config.target_is_mingw():
+        dependencies_cmdline.extend(args_parsed.mingw_dependency)
+        forced_before_libs.extend(["-static-libgcc", "-static-libstdc++"])
+
+    for dep in dependencies_cmdline:
         force = ""
         count = dep.count(',')
         if count == 2:

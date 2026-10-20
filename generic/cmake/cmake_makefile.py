@@ -88,18 +88,6 @@ def on_build(config: powermake.Config):
 
     print("dependencies found:", dependencies)
 
-    if hasattr(config, 'sdk_path'):
-        if config.target_is_android():
-            args_parsed.cmake_flag.extend([
-                f"-DCMAKE_TOOLCHAIN_FILE={os.path.join(config.sdk_path, 'ndk/27.3.13750724/build/cmake/android.toolchain.cmake')}",
-                "-DANDROID_PLATFORM=24"
-            ])
-            android_abis = {
-                'arm64': 'arm64-v8a'
-            }
-            if config.target_simplified_architecture in android_abis:
-                args_parsed.cmake_flag.append(f"-DANDROID_ABI={android_abis[config.target_simplified_architecture]}")
-
     powermake.run_cmake(config, "..", "-DCMAKE_BUILD_TYPE=Release", f"-DCMAKE_INSTALL_PREFIX={install_path}", *args_parsed.cmake_flag, prefer_static=args_parsed.cmake_static, dependencies=dependencies)
     if powermake.run_command(config, ["cmake", "--build", ".", "--config", "Release", "-j", str(os.cpu_count() or 2)]) != 0:
         raise powermake.PowerMakeRuntimeError("build failed")

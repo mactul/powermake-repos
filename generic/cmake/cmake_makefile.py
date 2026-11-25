@@ -8,7 +8,7 @@ import powermake.package
 parser = powermake.ArgumentParser()
 parser.add_argument("--cmake-static", help="instruct cmake to prefer building a static lib if possible", action="store_true")
 parser.add_argument("--need-libmath", help="instruct cmake to force include the libmath", action="store_true")
-parser.add_argument("--dependency", metavar="DEPENDENCY", help="syntax: libname,min_ver,max_ver[,force] ; may be given multiple time", action="append", default=[])
+parser.add_argument("--dependency", metavar="DEPENDENCY", help="syntax: libname,min_ver,max_ver[,force|,any_sys_ver] ; may be given multiple time", action="append", default=[])
 parser.add_argument("--mingw-dependency", metavar="DEPENDENCY", help="syntax: libname,min_ver,max_ver[,force] ; may be given multiple time", action="append", default=[])
 parser.add_argument("--cmake-flag", metavar="FLAG", help="A flag to transmit to CMake, may be given multiple time", action="append", default=[])
 parser.add_argument("--autogen-sh", help="Run `bash autogen.sh` before anything else", action="store_true")
@@ -46,35 +46,41 @@ def on_build(config: powermake.Config):
         forced_before_libs.extend(["-static-libgcc", "-static-libstdc++"])
 
     for dep in dependencies_cmdline:
-        force = ""
+        additional_param = ""
         count = dep.count(',')
         if count == 2:
             dep_name, dep_min_ver, dep_max_ver = dep.split(',')
         elif count == 3:
-            dep_name, dep_min_ver, dep_max_ver, force = dep.split(',')
-            if force not in ("force", "force_before"):
-                raise powermake.PowerMakeValueError("dependency syntax: libname,min_ver,max_ver[,force]")
+            dep_name, dep_min_ver, dep_max_ver, additional_param = dep.split(',')
+            if additional_param not in ("force", "force_before", "any_sys_ver"):
+                raise powermake.PowerMakeValueError("dependency syntax: libname,min_ver,max_ver[,force|,any_sys_ver]")
         else:
-            raise powermake.PowerMakeValueError("dependency syntax: libname,min_ver,max_ver[,force]")
+            raise powermake.PowerMakeValueError("dependency syntax: libname,min_ver,max_ver[,force|,any_sys_ver]")
 
         if dep_min_ver == 'None':
             dep_min_ver = None
         if dep_max_ver == 'None':
             dep_max_ver = None
 
-        lib = powermake.package.find_lib(config, dep_name, install_dir=powermake_libs_dir, min_version=dep_min_ver, max_version=dep_max_ver)
+        kwargs: T.Dict[str, T.Any] = {}
+        if additional_param == "any_sys_ver":
+            kwargs = {
+                "any_system_version": True
+            }
 
-        if force == "force":
+        lib = powermake.package.find_lib(config, dep_name, install_dir=powermake_libs_dir, min_version=dep_min_ver, max_version=dep_max_ver, **kwargs)
+
+        if additional_param == "force":
             forced_libs.append(lib.lib_file)
-            
-        elif force == "force_before":
+
+        elif additional_param == "force_before":
             forced_before_libs.append(lib.lib_file)
 
         dependencies.append(lib)
-    
+
     if args_parsed.need_libmath and (not config.target_is_windows() or config.target_is_mingw()):
         forced_libs.append("-lm")
-    
+
     if len(forced_libs) > 0:
         args_parsed.cmake_flag.extend([
             f"-DCMAKE_C_STANDARD_LIBRARIES={' '.join(forced_libs)}",
